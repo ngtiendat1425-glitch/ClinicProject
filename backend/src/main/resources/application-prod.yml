@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: ${CLINIC_DB_URL}
+    username: ${CLINIC_DB_USERNAME}
+    password: ${CLINIC_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  h2:
+    console:
+      enabled: false
+clinic:
+  cors-origins: ${CLINIC_CORS_ORIGINS}
+  uploads-path: ${CLINIC_UPLOADS_PATH}

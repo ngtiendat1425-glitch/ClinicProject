@@ -1,0 +1,875 @@
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+type Tab = 'home' | 'doctors' | 'appointments' | 'profile';
+type Doctor = {
+  id: string;
+  name: string;
+  specialty: string;
+  experience: string;
+  rating: string;
+  fee: string;
+  initials: string;
+  color: string;
+  available: string;
+};
+type Appointment = {
+  id: string;
+  doctor: Doctor;
+  date: string;
+  time: string;
+  type: string;
+  status: 'Chờ xác nhận' | 'Đã xác nhận' | 'Đã hủy';
+};
+
+const colors = {
+  ink: '#173B3C',
+  teal: '#087E78',
+  mint: '#E8F5F1',
+  muted: '#7C9090',
+  line: '#E7EFED',
+  canvas: '#F6F9F8',
+  white: '#FFFFFF',
+  orange: '#E99B57',
+  red: '#C45A52',
+};
+
+const doctors: Doctor[] = [
+  {
+    id: '1',
+    name: 'BS. Nguyễn Minh Anh',
+    specialty: 'Tim mạch',
+    experience: '12 năm kinh nghiệm',
+    rating: '4.9',
+    fee: '250.000đ',
+    initials: 'MA',
+    color: '#DDEFEA',
+    available: '09:30 hôm nay',
+  },
+  {
+    id: '2',
+    name: 'BS. Trần Hoàng Nam',
+    specialty: 'Nhi khoa',
+    experience: '9 năm kinh nghiệm',
+    rating: '4.8',
+    fee: '200.000đ',
+    initials: 'HN',
+    color: '#FCE9D9',
+    available: '10:00 hôm nay',
+  },
+  {
+    id: '3',
+    name: 'BS. Lê Thu Hà',
+    specialty: 'Da liễu',
+    experience: '8 năm kinh nghiệm',
+    rating: '4.9',
+    fee: '220.000đ',
+    initials: 'TH',
+    color: '#E9E4F6',
+    available: '14:00 hôm nay',
+  },
+];
+
+const specialties = [
+  { name: 'Tất cả', icon: '✳' },
+  { name: 'Tim mạch', icon: '♡' },
+  { name: 'Nhi khoa', icon: '⌁' },
+  { name: 'Da liễu', icon: '✦' },
+  { name: 'Nội tổng quát', icon: '＋' },
+];
+
+const dates = [
+  { day: 'Hôm nay', date: '17' },
+  { day: 'Thứ Tư', date: '18' },
+  { day: 'Thứ Năm', date: '19' },
+  { day: 'Thứ Sáu', date: '20' },
+];
+const times = ['08:30', '09:30', '10:00', '13:30', '14:00', '15:30'];
+
+function App() {
+  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [search, setSearch] = useState('');
+  const [specialty, setSpecialty] = useState('Tất cả');
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [selectedDate, setSelectedDate] = useState(dates[0]);
+  const [selectedTime, setSelectedTime] = useState(times[1]);
+  const [appointments, setAppointments] = useState<Appointment[]>([
+    {
+      id: 'sample',
+      doctor: doctors[0],
+      date: 'Thứ Tư, 18 tháng 6',
+      time: '09:30',
+      type: 'Khám trực tiếp',
+      status: 'Đã xác nhận',
+    },
+  ]);
+
+  const filteredDoctors = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('vi');
+    return doctors.filter((doctor) => {
+      const matchesSpecialty = specialty === 'Tất cả' || doctor.specialty === specialty;
+      const matchesSearch =
+        query.length === 0 ||
+        doctor.name.toLocaleLowerCase('vi').includes(query) ||
+        doctor.specialty.toLocaleLowerCase('vi').includes(query);
+      return matchesSpecialty && matchesSearch;
+    });
+  }, [search, specialty]);
+
+  const openBooking = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    setSelectedDate(dates[0]);
+    setSelectedTime(times[1]);
+  };
+
+  const confirmBooking = () => {
+    if (!selectedDoctor) return;
+    setAppointments((current) => [
+      {
+        id: `${Date.now()}`,
+        doctor: selectedDoctor,
+        date: `${selectedDate.day}, ${selectedDate.date} tháng 6`,
+        time: selectedTime,
+        type: 'Khám trực tiếp',
+        status: 'Chờ xác nhận',
+      },
+      ...current,
+    ]);
+    setSelectedDoctor(null);
+    setActiveTab('appointments');
+    Alert.alert('Đặt lịch thành công', 'Phòng khám sẽ xác nhận lịch hẹn của bạn sớm nhất.');
+  };
+
+  const cancelAppointment = (id: string) => {
+    Alert.alert('Hủy lịch hẹn?', 'Bạn có chắc muốn hủy lịch hẹn này không?', [
+      { text: 'Giữ lịch', style: 'cancel' },
+      {
+        text: 'Hủy lịch',
+        style: 'destructive',
+        onPress: () =>
+          setAppointments((current) =>
+            current.map((appointment) =>
+              appointment.id === id ? { ...appointment, status: 'Đã hủy' } : appointment,
+            ),
+          ),
+      },
+    ]);
+  };
+
+  return (
+    <View style={styles.app}>
+      <StatusBar style="dark" />
+      <NativeStatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
+      <View style={styles.screen}>
+        {activeTab === 'home' && (
+          <HomeScreen
+            search={search}
+            onSearch={setSearch}
+            onSelectSpecialty={(value) => {
+              setSpecialty(value);
+              setActiveTab('doctors');
+            }}
+            onSeeDoctors={() => setActiveTab('doctors')}
+            onBook={openBooking}
+          />
+        )}
+        {activeTab === 'doctors' && (
+          <DoctorsScreen
+            search={search}
+            onSearch={setSearch}
+            specialty={specialty}
+            onSelectSpecialty={setSpecialty}
+            doctors={filteredDoctors}
+            onBook={openBooking}
+          />
+        )}
+        {activeTab === 'appointments' && (
+          <AppointmentsScreen appointments={appointments} onCancel={cancelAppointment} />
+        )}
+        {activeTab === 'profile' && <ProfileScreen />}
+      </View>
+      <TabBar activeTab={activeTab} onChange={setActiveTab} />
+
+      <Modal
+        visible={selectedDoctor !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedDoctor(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelectedDoctor(null)} />
+          <View style={styles.bookingSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeading}>
+              <View>
+                <Text style={styles.eyebrow}>ĐẶT LỊCH KHÁM</Text>
+                <Text style={styles.sheetTitle}>Chọn thời gian</Text>
+              </View>
+              <Pressable onPress={() => setSelectedDoctor(null)} style={styles.closeButton}>
+                <Text style={styles.closeText}>×</Text>
+              </Pressable>
+            </View>
+            {selectedDoctor && <DoctorCompact doctor={selectedDoctor} />}
+            <Text style={styles.sectionLabel}>Ngày khám</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.dateRow}>
+                {dates.map((item) => {
+                  const selected = selectedDate.date === item.date;
+                  return (
+                    <Pressable
+                      key={item.date}
+                      style={[styles.dateCard, selected && styles.dateCardSelected]}
+                      onPress={() => setSelectedDate(item)}
+                    >
+                      <Text style={[styles.dateDay, selected && styles.selectedText]}>{item.day}</Text>
+                      <Text style={[styles.dateNumber, selected && styles.selectedText]}>
+                        {item.date}
+                      </Text>
+                      <Text style={[styles.dateMonth, selected && styles.selectedSubText]}>Tháng 6</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Text style={styles.sectionLabel}>Giờ khám</Text>
+            <View style={styles.timeGrid}>
+              {times.map((time) => {
+                const selected = selectedTime === time;
+                return (
+                  <Pressable
+                    key={time}
+                    style={[styles.timeChip, selected && styles.timeChipSelected]}
+                    onPress={() => setSelectedTime(time)}
+                  >
+                    <Text style={[styles.timeText, selected && styles.selectedText]}>{time}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.bookingTotal}>
+              <Text style={styles.totalLabel}>Phí khám dự kiến</Text>
+              <Text style={styles.totalPrice}>{selectedDoctor?.fee}</Text>
+            </View>
+            <PrimaryButton title="Xác nhận đặt lịch" onPress={confirmBooking} />
+            <Text style={styles.sheetNote}>Bạn chưa cần thanh toán ở bước này</Text>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function HomeScreen({
+  search,
+  onSearch,
+  onSelectSpecialty,
+  onSeeDoctors,
+  onBook,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  onSelectSpecialty: (value: string) => void;
+  onSeeDoctors: () => void;
+  onBook: (doctor: Doctor) => void;
+}) {
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.topHeader}>
+        <View style={styles.brandLine}>
+          <View style={styles.brandMark}>
+            <Text style={styles.brandMarkText}>+</Text>
+          </View>
+          <Text style={styles.brandName}>an tâm</Text>
+        </View>
+        <Pressable style={styles.notificationButton} onPress={() => Alert.alert('Thông báo', 'Bạn chưa có thông báo mới.')}>
+          <Text style={styles.notificationIcon}>♧</Text>
+          <View style={styles.notificationDot} />
+        </Pressable>
+      </View>
+      <Text style={styles.greeting}>Chào buổi sáng,</Text>
+      <Text style={styles.greetingName}>Tiến Đạt <Text style={styles.wave}>✦</Text></Text>
+      <Text style={styles.introText}>Chăm sóc sức khỏe của bạn bắt đầu từ đây.</Text>
+
+      <SearchField value={search} onChange={onSearch} />
+
+      <View style={styles.heroCard}>
+        <View style={styles.heroTextBlock}>
+          <Text style={styles.heroKicker}>SỨC KHỎE LÀ ƯU TIÊN</Text>
+          <Text style={styles.heroTitle}>Đặt lịch khám{'\n'}nhanh chóng</Text>
+          <Text style={styles.heroDescription}>Chọn bác sĩ phù hợp với bạn</Text>
+          <Pressable style={styles.heroButton} onPress={onSeeDoctors}>
+            <Text style={styles.heroButtonText}>Đặt lịch ngay  ›</Text>
+          </Pressable>
+        </View>
+        <View style={styles.heroArtwork}>
+          <View style={styles.heroCircle}>
+            <Text style={styles.heroCross}>+</Text>
+          </View>
+          <Text style={styles.heroSparkle}>✦</Text>
+          <Text style={styles.heroLeaf}>⌁</Text>
+        </View>
+      </View>
+
+      <View style={styles.quickStats}>
+        <View style={styles.quickStat}>
+          <Text style={styles.statIcon}>♧</Text>
+          <Text style={styles.statTitle}>Bác sĩ giỏi</Text>
+          <Text style={styles.statCaption}>Đội ngũ tận tâm</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.quickStat}>
+          <Text style={styles.statIcon}>◷</Text>
+          <Text style={styles.statTitle}>Linh hoạt</Text>
+          <Text style={styles.statCaption}>Chọn giờ phù hợp</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.quickStat}>
+          <Text style={styles.statIcon}>♡</Text>
+          <Text style={styles.statTitle}>An toàn</Text>
+          <Text style={styles.statCaption}>Chăm sóc chu đáo</Text>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Chuyên khoa</Text>
+          <Text style={styles.sectionHint}>Tìm đúng chuyên môn bạn cần</Text>
+        </View>
+        <Pressable onPress={onSeeDoctors}><Text style={styles.linkText}>Tất cả ›</Text></Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specialtyRow}>
+        {specialties.slice(1).map((item, index) => (
+          <Pressable key={item.name} style={styles.specialtyCard} onPress={() => onSelectSpecialty(item.name)}>
+            <View style={[styles.specialtyIconWrap, { backgroundColor: ['#FCE8E4', '#E9F1FC', '#F3EAF8', '#FCEFD9'][index] }]}>
+              <Text style={[styles.specialtyIcon, { color: [colors.red, '#4A77A8', '#8F62A8', '#BD7B38'][index] }]}>{item.icon}</Text>
+            </View>
+            <Text style={styles.specialtyName}>{item.name}</Text>
+            <Text style={styles.specialtyCount}>{[8, 6, 5, 12][index]} bác sĩ</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Bác sĩ nổi bật</Text>
+          <Text style={styles.sectionHint}>Được bệnh nhân tin tưởng</Text>
+        </View>
+        <Pressable onPress={onSeeDoctors}><Text style={styles.linkText}>Xem thêm ›</Text></Pressable>
+      </View>
+      {doctors.slice(0, 2).map((doctor) => (
+        <DoctorCard key={doctor.id} doctor={doctor} onBook={() => onBook(doctor)} />
+      ))}
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+}
+
+function DoctorsScreen({
+  search,
+  onSearch,
+  specialty,
+  onSelectSpecialty,
+  doctors: doctorList,
+  onBook,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  specialty: string;
+  onSelectSpecialty: (value: string) => void;
+  doctors: Doctor[];
+  onBook: (doctor: Doctor) => void;
+}) {
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageEyebrow}>CHĂM SÓC SỨC KHỎE</Text>
+        <Text style={styles.pageTitle}>Tìm bác sĩ</Text>
+        <Text style={styles.pageSubtitle}>Chọn chuyên gia phù hợp với bạn</Text>
+      </View>
+      <SearchField value={search} onChange={onSearch} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        {specialties.map((item) => {
+          const selected = specialty === item.name;
+          return (
+            <Pressable
+              key={item.name}
+              onPress={() => onSelectSpecialty(item.name)}
+              style={[styles.filterChip, selected && styles.filterChipSelected]}
+            >
+              <Text style={[styles.filterText, selected && styles.selectedText]}>{item.name}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <View style={styles.resultsHeader}>
+        <Text style={styles.resultsTitle}>{doctorList.length} bác sĩ phù hợp</Text>
+        <Text style={styles.sortLabel}>Gần bạn⌄</Text>
+      </View>
+      {doctorList.length > 0 ? (
+        doctorList.map((doctor) => <DoctorCard key={doctor.id} doctor={doctor} onBook={() => onBook(doctor)} />)
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>⌕</Text>
+          <Text style={styles.emptyTitle}>Chưa tìm thấy bác sĩ</Text>
+          <Text style={styles.emptyCopy}>Thử từ khóa hoặc chuyên khoa khác nhé.</Text>
+        </View>
+      )}
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+}
+
+function AppointmentsScreen({
+  appointments,
+  onCancel,
+}: {
+  appointments: Appointment[];
+  onCancel: (id: string) => void;
+}) {
+  const upcoming = appointments.filter((item) => item.status !== 'Đã hủy');
+  const history = appointments.filter((item) => item.status === 'Đã hủy');
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageEyebrow}>THEO DÕI SỨC KHỎE</Text>
+        <Text style={styles.pageTitle}>Lịch hẹn</Text>
+        <Text style={styles.pageSubtitle}>Quản lý các buổi khám của bạn</Text>
+      </View>
+      <View style={styles.appointmentSummary}>
+        <View style={styles.summaryIcon}><Text style={styles.summaryIconText}>▣</Text></View>
+        <View style={styles.summaryContent}>
+          <Text style={styles.summaryTitle}>{upcoming.length} lịch hẹn sắp tới</Text>
+          <Text style={styles.summarySubtitle}>Đừng quên lịch khám của bạn nhé</Text>
+        </View>
+        <Text style={styles.summaryArrow}>›</Text>
+      </View>
+      <Text style={styles.sectionTitle}>Sắp tới</Text>
+      {upcoming.length > 0 ? (
+        upcoming.map((appointment) => (
+          <AppointmentCard key={appointment.id} appointment={appointment} onCancel={onCancel} />
+        ))
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>▣</Text>
+          <Text style={styles.emptyTitle}>Bạn chưa có lịch hẹn</Text>
+          <Text style={styles.emptyCopy}>Lịch khám mới sẽ hiển thị tại đây.</Text>
+        </View>
+      )}
+      {history.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, styles.historyHeading]}>Lịch đã hủy</Text>
+          {history.map((appointment) => <AppointmentCard key={appointment.id} appointment={appointment} />)}
+        </>
+      )}
+      <View style={styles.helpCard}>
+        <Text style={styles.helpIcon}>i</Text>
+        <View style={styles.helpTextBlock}>
+          <Text style={styles.helpTitle}>Cần hỗ trợ?</Text>
+          <Text style={styles.helpCopy}>Liên hệ phòng khám qua số 1900 1234</Text>
+        </View>
+        <Text style={styles.helpArrow}>›</Text>
+      </View>
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+}
+
+function ProfileScreen() {
+  const menuItems = [
+    { icon: '♡', title: 'Hồ sơ sức khỏe', subtitle: 'Thông tin cá nhân và tiền sử' },
+    { icon: '▤', title: 'Lịch sử khám bệnh', subtitle: 'Kết quả các lần khám trước' },
+    { icon: '♧', title: 'Thông báo', subtitle: 'Cập nhật lịch hẹn của bạn' },
+    { icon: '⚙', title: 'Cài đặt tài khoản', subtitle: 'Mật khẩu và quyền riêng tư' },
+  ];
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageEyebrow}>TÀI KHOẢN CỦA BẠN</Text>
+        <Text style={styles.pageTitle}>Cá nhân</Text>
+      </View>
+      <View style={styles.profileCard}>
+        <View style={styles.profileAvatar}><Text style={styles.profileInitials}>Đ</Text></View>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>Nguyễn Tiến Đạt</Text>
+          <Text style={styles.profilePhone}>0901 234 567</Text>
+          <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓  Tài khoản đã xác thực</Text></View>
+        </View>
+        <Text style={styles.profileArrow}>›</Text>
+      </View>
+      <View style={styles.profileStats}>
+        <View style={styles.profileStat}>
+          <Text style={styles.profileStatValue}>01</Text>
+          <Text style={styles.profileStatLabel}>Lịch khám</Text>
+        </View>
+        <View style={styles.profileStatDivider} />
+        <View style={styles.profileStat}>
+          <Text style={styles.profileStatValue}>01</Text>
+          <Text style={styles.profileStatLabel}>Hồ sơ sức khỏe</Text>
+        </View>
+        <View style={styles.profileStatDivider} />
+        <View style={styles.profileStat}>
+          <Text style={styles.profileStatValue}>02</Text>
+          <Text style={styles.profileStatLabel}>Thông báo mới</Text>
+        </View>
+      </View>
+      <Text style={styles.sectionTitle}>Tài khoản</Text>
+      <View style={styles.menuCard}>
+        {menuItems.map((item, index) => (
+          <Pressable
+            key={item.title}
+            style={[styles.menuItem, index < menuItems.length - 1 && styles.menuItemBorder]}
+            onPress={() => Alert.alert(item.title, 'Tính năng đang được hoàn thiện trong bản demo.')}
+          >
+            <View style={styles.menuIcon}><Text style={styles.menuIconText}>{item.icon}</Text></View>
+            <View style={styles.menuCopy}>
+              <Text style={styles.menuTitle}>{item.title}</Text>
+              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        style={styles.logoutButton}
+        onPress={() => Alert.alert('Đăng xuất', 'Bạn đã đăng xuất khỏi tài khoản demo.')}
+      >
+        <Text style={styles.logoutIcon}>↪</Text>
+        <Text style={styles.logoutText}>Đăng xuất</Text>
+      </Pressable>
+      <Text style={styles.versionText}>an tâm  •  Phiên bản 1.0.0</Text>
+      <View style={styles.bottomSpace} />
+    </ScrollView>
+  );
+}
+
+function DoctorCompact({ doctor }: { doctor: Doctor }) {
+  return (
+    <View style={styles.compactDoctor}>
+      <View style={[styles.doctorAvatar, { backgroundColor: doctor.color }]}>
+        <Text style={styles.doctorInitials}>{doctor.initials}</Text>
+      </View>
+      <View style={styles.doctorInfo}>
+        <Text style={styles.doctorName}>{doctor.name}</Text>
+        <Text style={styles.doctorSpecialty}>{doctor.specialty}  ·  {doctor.experience}</Text>
+      </View>
+    </View>
+  );
+}
+
+function DoctorCard({ doctor, onBook }: { doctor: Doctor; onBook: () => void }) {
+  return (
+    <View style={styles.doctorCard}>
+      <View style={styles.doctorCardTop}>
+        <View style={[styles.doctorAvatar, { backgroundColor: doctor.color }]}>
+          <Text style={styles.doctorInitials}>{doctor.initials}</Text>
+          <View style={styles.onlineDot} />
+        </View>
+        <View style={styles.doctorInfo}>
+          <Text style={styles.doctorName}>{doctor.name}</Text>
+          <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+          <Text style={styles.doctorExperience}>{doctor.experience}</Text>
+        </View>
+        <View style={styles.ratingBadge}><Text style={styles.ratingText}>★ {doctor.rating}</Text></View>
+      </View>
+      <View style={styles.doctorCardDivider} />
+      <View style={styles.doctorCardBottom}>
+        <View>
+          <Text style={styles.availabilityLabel}>LỊCH TRỐNG GẦN NHẤT</Text>
+          <Text style={styles.availabilityTime}>◷  {doctor.available}</Text>
+        </View>
+        <Pressable style={styles.bookButton} onPress={onBook}>
+          <Text style={styles.bookButtonText}>Đặt lịch</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function AppointmentCard({
+  appointment,
+  onCancel,
+}: {
+  appointment: Appointment;
+  onCancel?: (id: string) => void;
+}) {
+  const statusColor = appointment.status === 'Đã xác nhận' ? colors.teal : appointment.status === 'Đã hủy' ? colors.red : colors.orange;
+  const statusBackground = appointment.status === 'Đã xác nhận' ? colors.mint : appointment.status === 'Đã hủy' ? '#FCEBE9' : '#FFF3E6';
+  return (
+    <View style={styles.appointmentCard}>
+      <View style={styles.appointmentDateHeader}>
+        <View style={styles.calendarIcon}><Text style={styles.calendarIconText}>▣</Text></View>
+        <View style={styles.appointmentDateCopy}>
+          <Text style={styles.appointmentDate}>{appointment.date}</Text>
+          <Text style={styles.appointmentTime}>◷  {appointment.time}</Text>
+        </View>
+        <View style={[styles.statusPill, { backgroundColor: statusBackground }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{appointment.status}</Text>
+        </View>
+      </View>
+      <View style={styles.appointmentDivider} />
+      <View style={styles.appointmentDoctorRow}>
+        <View style={[styles.smallAvatar, { backgroundColor: appointment.doctor.color }]}>
+          <Text style={styles.smallAvatarText}>{appointment.doctor.initials}</Text>
+        </View>
+        <View style={styles.doctorInfo}>
+          <Text style={styles.doctorName}>{appointment.doctor.name}</Text>
+          <Text style={styles.doctorSpecialty}>{appointment.doctor.specialty}  ·  {appointment.type}</Text>
+        </View>
+      </View>
+      {appointment.status !== 'Đã hủy' && onCancel && (
+        <Pressable style={styles.cancelButton} onPress={() => onCancel(appointment.id)}>
+          <Text style={styles.cancelButtonText}>Hủy lịch hẹn</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function SearchField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <View style={styles.searchBox}>
+      <Text style={styles.searchIcon}>⌕</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="Tìm bác sĩ, chuyên khoa..."
+        placeholderTextColor="#9AA9A7"
+        style={styles.searchInput}
+        returnKeyType="search"
+        accessibilityLabel="Tìm bác sĩ hoặc chuyên khoa"
+      />
+      <View style={styles.searchFilter}><Text style={styles.searchFilterText}>☷</Text></View>
+    </View>
+  );
+}
+
+function PrimaryButton({ title, onPress }: { title: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.primaryButton} onPress={onPress}>
+      <Text style={styles.primaryButtonText}>{title}</Text>
+      <Text style={styles.primaryButtonArrow}>›</Text>
+    </Pressable>
+  );
+}
+
+function TabBar({ activeTab, onChange }: { activeTab: Tab; onChange: (tab: Tab) => void }) {
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'home', label: 'Trang chủ', icon: '⌂' },
+    { id: 'doctors', label: 'Bác sĩ', icon: '✚' },
+    { id: 'appointments', label: 'Lịch hẹn', icon: '▣' },
+    { id: 'profile', label: 'Cá nhân', icon: '◉' },
+  ];
+  return (
+    <View style={styles.tabBar}>
+      {tabs.map((tab) => {
+        const selected = activeTab === tab.id;
+        return (
+          <Pressable key={tab.id} style={styles.tabItem} onPress={() => onChange(tab.id)}>
+            <View style={[styles.tabIconWrap, selected && styles.tabIconWrapSelected]}>
+              <Text style={[styles.tabIcon, selected && styles.tabIconSelected]}>{tab.icon}</Text>
+            </View>
+            <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  app: { flex: 1, backgroundColor: colors.canvas },
+  screen: { flex: 1 },
+  scrollContent: { paddingHorizontal: 22, paddingTop: 10 },
+  bottomSpace: { height: 24 },
+  topHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 26 },
+  brandLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandMark: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
+  brandMarkText: { color: colors.white, fontSize: 24, lineHeight: 28, fontWeight: '500' },
+  brandName: { color: colors.ink, fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
+  notificationButton: { width: 42, height: 42, borderRadius: 15, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
+  notificationIcon: { color: colors.ink, fontSize: 22 },
+  notificationDot: { position: 'absolute', top: 9, right: 10, width: 7, height: 7, borderRadius: 4, backgroundColor: '#EF806B', borderWidth: 1, borderColor: colors.white },
+  greeting: { color: colors.muted, fontSize: 15, fontWeight: '500' },
+  greetingName: { color: colors.ink, fontSize: 27, fontWeight: '800', marginTop: 2, letterSpacing: -0.8 },
+  wave: { color: colors.orange, fontSize: 18 },
+  introText: { color: colors.muted, fontSize: 13, marginTop: 6, marginBottom: 20 },
+  searchBox: { height: 52, borderRadius: 16, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: colors.line, marginBottom: 20 },
+  searchIcon: { color: colors.teal, fontSize: 28, lineHeight: 32, marginRight: 9 },
+  searchInput: { flex: 1, color: colors.ink, fontSize: 13, paddingVertical: 0 },
+  searchFilter: { width: 31, height: 31, borderRadius: 10, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center' },
+  searchFilterText: { color: colors.teal, fontSize: 17 },
+  heroCard: { height: 194, borderRadius: 23, overflow: 'hidden', backgroundColor: '#087E78', padding: 20, flexDirection: 'row', marginBottom: 14 },
+  heroTextBlock: { zIndex: 2 },
+  heroKicker: { color: '#B9E4D9', fontSize: 9, letterSpacing: 1.1, fontWeight: '800' },
+  heroTitle: { color: colors.white, fontSize: 23, fontWeight: '800', lineHeight: 29, marginTop: 8, letterSpacing: -0.5 },
+  heroDescription: { color: '#D1EBE5', fontSize: 11, marginTop: 6 },
+  heroButton: { marginTop: 13, alignSelf: 'flex-start', borderRadius: 11, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#E5F4EE' },
+  heroButtonText: { color: colors.teal, fontSize: 11, fontWeight: '800' },
+  heroArtwork: { position: 'absolute', right: -2, top: 9, width: 155, height: 180, alignItems: 'center', justifyContent: 'center' },
+  heroCircle: { width: 128, height: 128, borderRadius: 64, backgroundColor: '#26978D', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#69B9AA' },
+  heroCross: { color: '#D4F0E7', fontSize: 92, lineHeight: 100, fontWeight: '200' },
+  heroSparkle: { position: 'absolute', color: '#EFD59E', fontSize: 22, right: 18, top: 15 },
+  heroLeaf: { position: 'absolute', color: '#9CD5C6', fontSize: 50, bottom: 1, left: 3, transform: [{ rotate: '-35deg' }] },
+  quickStats: { height: 78, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.white, borderRadius: 17, borderWidth: 1, borderColor: colors.line, marginBottom: 25 },
+  quickStat: { flex: 1, alignItems: 'center' },
+  statIcon: { color: colors.teal, fontSize: 17, marginBottom: 3 },
+  statTitle: { color: colors.ink, fontSize: 10, fontWeight: '700' },
+  statCaption: { color: colors.muted, fontSize: 8, marginTop: 3 },
+  statDivider: { width: 1, height: 37, backgroundColor: colors.line },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 },
+  sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  sectionHint: { color: colors.muted, fontSize: 11, marginTop: 4 },
+  linkText: { color: colors.teal, fontSize: 11, fontWeight: '700' },
+  specialtyRow: { gap: 10, paddingBottom: 24 },
+  specialtyCard: { width: 102, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, padding: 11 },
+  specialtyIconWrap: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
+  specialtyIcon: { fontSize: 21, fontWeight: '600' },
+  specialtyName: { color: colors.ink, fontSize: 10, fontWeight: '700' },
+  specialtyCount: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  doctorCard: { backgroundColor: colors.white, borderRadius: 19, padding: 14, borderWidth: 1, borderColor: colors.line, marginBottom: 12 },
+  doctorCardTop: { flexDirection: 'row', alignItems: 'center' },
+  doctorAvatar: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 12, position: 'relative' },
+  doctorInitials: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  onlineDot: { position: 'absolute', width: 11, height: 11, right: 0, bottom: 0, borderRadius: 6, borderWidth: 2, borderColor: colors.white, backgroundColor: '#49AF82' },
+  doctorInfo: { flex: 1 },
+  doctorName: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  doctorSpecialty: { color: colors.teal, fontSize: 10, fontWeight: '600', marginTop: 4 },
+  doctorExperience: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  ratingBadge: { backgroundColor: '#FFF6E9', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, alignSelf: 'flex-start' },
+  ratingText: { color: '#B7792D', fontSize: 10, fontWeight: '800' },
+  doctorCardDivider: { height: 1, backgroundColor: colors.line, marginVertical: 13 },
+  doctorCardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  availabilityLabel: { color: colors.muted, fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
+  availabilityTime: { color: colors.ink, fontSize: 10, fontWeight: '700', marginTop: 5 },
+  bookButton: { paddingHorizontal: 15, paddingVertical: 9, backgroundColor: colors.teal, borderRadius: 11 },
+  bookButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
+  pageHeader: { paddingTop: 16, paddingBottom: 19 },
+  pageEyebrow: { color: colors.teal, fontSize: 9, letterSpacing: 1.2, fontWeight: '800', marginBottom: 7 },
+  pageTitle: { color: colors.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.8 },
+  pageSubtitle: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  filterRow: { gap: 8, paddingBottom: 20 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  filterChipSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
+  filterText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  selectedText: { color: colors.white },
+  selectedSubText: { color: '#C9E9E2' },
+  resultsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  resultsTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  sortLabel: { color: colors.muted, fontSize: 10 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50, paddingHorizontal: 20, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line },
+  emptyIcon: { color: '#9DBFBA', fontSize: 36, marginBottom: 10 },
+  emptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  emptyCopy: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 6 },
+  appointmentSummary: { padding: 14, backgroundColor: '#E8F5F1', borderRadius: 17, flexDirection: 'row', alignItems: 'center', marginBottom: 23 },
+  summaryIcon: { width: 41, height: 41, borderRadius: 13, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  summaryIconText: { color: colors.teal, fontSize: 20 },
+  summaryContent: { flex: 1 },
+  summaryTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  summarySubtitle: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  summaryArrow: { color: colors.teal, fontSize: 25 },
+  appointmentCard: { backgroundColor: colors.white, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.line, marginTop: 12 },
+  appointmentDateHeader: { flexDirection: 'row', alignItems: 'center' },
+  calendarIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.mint, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  calendarIconText: { color: colors.teal, fontSize: 18 },
+  appointmentDateCopy: { flex: 1 },
+  appointmentDate: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  appointmentTime: { color: colors.muted, fontSize: 10, marginTop: 5 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 },
+  statusText: { fontSize: 8, fontWeight: '800' },
+  appointmentDivider: { height: 1, backgroundColor: colors.line, marginVertical: 13 },
+  appointmentDoctorRow: { flexDirection: 'row', alignItems: 'center' },
+  smallAvatar: { width: 39, height: 39, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  smallAvatarText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  cancelButton: { borderWidth: 1, borderColor: '#F0D8D5', borderRadius: 10, paddingVertical: 9, alignItems: 'center', marginTop: 13 },
+  cancelButtonText: { color: colors.red, fontSize: 10, fontWeight: '700' },
+  helpCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 13, flexDirection: 'row', alignItems: 'center', marginTop: 22 },
+  helpIcon: { width: 27, height: 27, borderRadius: 9, overflow: 'hidden', textAlign: 'center', textAlignVertical: 'center', color: colors.teal, backgroundColor: colors.mint, fontSize: 15, fontWeight: '800', marginRight: 10 },
+  helpTextBlock: { flex: 1 },
+  helpTitle: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  helpCopy: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  helpArrow: { color: colors.muted, fontSize: 22 },
+  historyHeading: { marginTop: 24 },
+  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 19, padding: 15, borderWidth: 1, borderColor: colors.line, marginBottom: 13 },
+  profileAvatar: { width: 58, height: 58, borderRadius: 20, backgroundColor: '#DCEFE9', alignItems: 'center', justifyContent: 'center', marginRight: 13 },
+  profileInitials: { color: colors.teal, fontSize: 25, fontWeight: '800' },
+  profileInfo: { flex: 1 },
+  profileName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  profilePhone: { color: colors.muted, fontSize: 10, marginTop: 5 },
+  verifiedBadge: { alignSelf: 'flex-start', backgroundColor: colors.mint, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4, marginTop: 7 },
+  verifiedText: { color: colors.teal, fontSize: 8, fontWeight: '700' },
+  profileArrow: { color: colors.muted, fontSize: 23 },
+  profileStats: { flexDirection: 'row', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, paddingVertical: 15, marginBottom: 25 },
+  profileStat: { flex: 1, alignItems: 'center' },
+  profileStatValue: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  profileStatLabel: { color: colors.muted, fontSize: 8, marginTop: 4 },
+  profileStatDivider: { width: 1, backgroundColor: colors.line },
+  menuCard: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingHorizontal: 13, marginTop: 12 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13 },
+  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  menuIcon: { width: 36, height: 36, backgroundColor: colors.mint, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  menuIconText: { color: colors.teal, fontSize: 17 },
+  menuCopy: { flex: 1 },
+  menuTitle: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  menuSubtitle: { color: colors.muted, fontSize: 9, marginTop: 4 },
+  menuArrow: { color: '#9CAAA8', fontSize: 21 },
+  logoutButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, marginTop: 12 },
+  logoutIcon: { color: colors.red, fontSize: 18, marginRight: 7 },
+  logoutText: { color: colors.red, fontSize: 11, fontWeight: '800' },
+  versionText: { color: '#A8B5B2', fontSize: 9, textAlign: 'center' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20, 45, 43, 0.38)' },
+  bookingSheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 27, borderTopRightRadius: 27, paddingHorizontal: 21, paddingTop: 11, paddingBottom: 26 },
+  sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: '#D4DFDC', alignSelf: 'center', marginBottom: 19 },
+  sheetHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 17 },
+  eyebrow: { color: colors.teal, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+  sheetTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', marginTop: 4 },
+  closeButton: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  closeText: { color: colors.muted, fontSize: 23, lineHeight: 26 },
+  compactDoctor: { flexDirection: 'row', alignItems: 'center', padding: 11, backgroundColor: colors.white, borderRadius: 15, borderWidth: 1, borderColor: colors.line, marginBottom: 20 },
+  sectionLabel: { color: colors.ink, fontSize: 12, fontWeight: '800', marginBottom: 11 },
+  dateRow: { gap: 8, paddingBottom: 19 },
+  dateCard: { width: 72, height: 78, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  dateCardSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
+  dateDay: { color: colors.muted, fontSize: 8 },
+  dateNumber: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 3 },
+  dateMonth: { color: colors.muted, fontSize: 8, marginTop: 2 },
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  timeChip: { width: '31%', borderRadius: 10, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  timeChipSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
+  timeText: { color: colors.ink, fontSize: 10, fontWeight: '700' },
+  bookingTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.line },
+  totalLabel: { color: colors.muted, fontSize: 11 },
+  totalPrice: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  primaryButton: { height: 49, borderRadius: 14, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  primaryButtonText: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  primaryButtonArrow: { color: colors.white, fontSize: 21, position: 'absolute', right: 17 },
+  sheetNote: { color: colors.muted, textAlign: 'center', fontSize: 9, marginTop: 9 },
+  tabBar: { height: 75, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingBottom: 5 },
+  tabItem: { width: '25%', alignItems: 'center', justifyContent: 'center' },
+  tabIconWrap: { width: 37, height: 29, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  tabIconWrapSelected: { backgroundColor: colors.mint },
+  tabIcon: { color: '#9AA9A7', fontSize: 18 },
+  tabIconSelected: { color: colors.teal },
+  tabLabel: { color: '#9AA9A7', fontSize: 8, marginTop: 3 },
+  tabLabelSelected: { color: colors.teal, fontWeight: '800' },
+});
+
+export default App;

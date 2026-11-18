@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Local browser verification artifacts
+.tmp/
+
 # generated native folders
 /ios
 /android

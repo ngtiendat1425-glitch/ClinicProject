@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: an-tam-clinic-api
+  profiles:
+    default: dev
+  jackson:
+    default-property-inclusion: non_null
+  flyway:
+    enabled: true
+  sql:
+    init:
+      mode: never
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  tomcat:
+    max-http-form-post-size: 64KB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+clinic:
+  cors-origins: ${CLINIC_CORS_ORIGINS:http://localhost:8081}
+  token-hours: 8
+  auth-rate-limit: 20
+  uploads-path: ${CLINIC_UPLOADS_PATH:./uploads}
